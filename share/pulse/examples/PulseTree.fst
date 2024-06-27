@@ -40,7 +40,7 @@ let t (a: Type0) = option (ref (node1 a))*)
 //of the functional tree, left and right are the left and right subtrees of the fiunctional tree
 //respectively. Additionally, the left and right concrete subtrees are is_tree itself with respect to left
 //and right of the functional tree respectively.
-(*let rec is_tree #t (ct:tree_t t) (ft:T.tree t)
+let rec is_tree #t (ct:tree_t t) (ft:T.tree t)
 : Tot vprop (decreases ft)
 = match ft with
   | T.Leaf -> pure (ct == None)
@@ -860,4 +860,4 @@ ensures
     is_tree node.right rtree **
     pure (ft == T.Node node.data ltree rtree)*)
 
-    *)
+    
