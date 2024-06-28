@@ -578,37 +578,8 @@ fn node_data (#t:Type) (x:tree_t t)
 }
 ```
 
-
-(*/// Returns a boolean indicating whether element [v] belongs to the tree that [ptr] points to
-val member (#a: eqtype) (ptr: t a) (v: a)
-    : Steel bool (linked_tree ptr) (fun _ -> linked_tree ptr)
-    (requires fun _ -> True)
-    (ensures fun h0 b h1 ->
-        v_linked_tree ptr h0 == v_linked_tree ptr h1 /\
-        (Spec.mem (v_linked_tree ptr h0) v <==> b))*)
-
-(*```pulse
-fn is_empty (#t:Type) (x:tree_t t) 
-    requires is_tree x 'l
-    returns b:bool
-    ensures is_tree x 'l ** pure (b <==> ('l == T.Leaf))
-{
-    match x {
-        None -> {
-            is_tree_case_none x;
-            true
-        }
-        Some vl -> {
-            is_tree_case_some x vl;
-            intro_is_tree_cons x vl;
-            false
-        }
-    }
-}
-```*)
-
 ```pulse
-fn rec is_mem (#t:Type) (x:tree_t t) (v: t)
+fn rec is_mem (#t:eqtype) (x:tree_t t) (v: t)
     requires is_tree x 'l
     returns b:bool
     ensures is_tree x 'l ** pure (b <==> (T.mem 'l v))
@@ -626,55 +597,95 @@ fn rec is_mem (#t:Type) (x:tree_t t) (v: t)
             rewrite each _node as n;
 
             let dat = n.data;
-           
-         
+            
             if (dat = v) 
             {
-              admit()
+              intro_is_tree_cons x vl;
+              true
             }
             else{
-              admit()
+              let b1 = is_mem n.left v;
+              let b2 = is_mem n.right v;
+
+              let b3 = b1 || b2;
+              intro_is_tree_cons x vl;
+              b3;
+              
             }
         }
     }
 }
 ```
+```pulse //cases_of_is_tree$
+ghost
+fn cases_of_is_tree_reverse #t (x:tree_t t) (ft:T.tree t)
+requires  is_tree_cases x ft
 
-(*let rotate_left (#a: Type) (r: tree a) : option (tree a) =
-  match r with
-  | Node x t1 (Node z t2 t3) -> Some (Node z (Node x t1 t2) t3)
-  | _ -> None*)
+ensures is_tree x ft
+{
+  admit()
+}
+```
 
-(*val rotate_left (#a: Type) (ptr: t a)
-    : Steel (t a) (linked_tree ptr) (fun ptr' -> linked_tree ptr')
-    (requires fun h0 -> Some? (Spec.rotate_left (v_linked_tree ptr h0)))
-    (ensures (fun h0 ptr' h1 ->
-        Spec.rotate_left (v_linked_tree ptr h0) == Some (v_linked_tree ptr' h1)
-    ))*)
+```pulse //is_list_case_some$
+ghost
+fn is_tree_case_some1 (#t:Type) (x:tree_t t) (v:node_ptr t) (#ft:T.tree t) 
+requires 
+exists* (node:node t) (ltree:T.tree t) (rtree:T.tree t).
+    is_tree x ft **
+    pts_to v node **
+    is_tree node.left ltree **
+    is_tree node.right rtree **
+    pure (ft == T.Node node.data ltree rtree)
 
-//The 'l is a Node. Can you derive x is a some?
+ensures  is_tree x ft ** pure (x == Some v)
+   
+  
+{
+  
+  fold(is_tree_cases (Some v) ft);
+  //rewrite each (Some v) as x;
+  //show_proof_state;
+  cases_of_is_tree_reverse (Some v) ft;
+  //show_proof_state;
+  assert (is_tree x ft);
+  
+  //show_proof_state;
+  
+  admit()
+}
+```
+
+
+(*cases_of_is_tree x ft;
+  rewrite each x as (Some v);
+  unfold (is_tree_cases (Some v) ft);*)
+
 ```pulse
 ghost
-fn non_empty_tree (#t:Type0) (x:tree_t t)
-requires is_tree x 'l ** pure (T.Node? 'l)
-ensures is_tree x 'l ** pure (Some? x)
+fn non_empty_tree (#t:Type0) (x:tree_t t) (ft:T.tree t)
+requires is_tree x ft ** pure (T.Node? ft)
+ensures is_tree x ft ** pure (Some? x)
 {
-    (*let spec_t = reveal 'l;
-    match spec_t {
-      T.Node data ltree rtree -> {
-        elim_is_tree_cons x 'l data ltree rtree;
-        assert (pure (Some? x));
-        let vl = Some?.v x;
-        intro_is_tree_cons x vl;
+    match x {
+      None -> {
+        intro_is_tree_nil x;
+        show_proof_state;
         admit()
       }
-      T.Leaf -> {
-        unreachable ()
+      Some vl -> {
+        admit()
       }
-    }*)
+    }
+   
+    (*n intro_is_tree_cons (#t:Type0) (ct:tree_t t) (v:node_ptr t) (#node:node t) (#ltree:T.tree t) (#rtree:T.tree t)
+  requires
+  pts_to v node **
+  is_tree node.left ltree **
+  is_tree node.right rtree **
+  pure (ct == Some v)*)
 
-    
-    elim_is_tree_cons x _ (T.Node?.data 'l) (T.Node?.left 'l) (T.Node?.right 'l);
+    (*elim_is_tree_cons x _ (T.Node?.data 'l) (T.Node?.left 'l) (T.Node?.right 'l);
 
     with v lct rct. _;
     with n left right. assert (pts_to v n ** is_tree lct left ** is_tree rct right);
@@ -727,8 +738,7 @@ ensures is_tree x 'l ** pure (Some? x)
 
    
     //show_proof_state;
-    //intro_is_tree_cons x v #n #left #right;*)
-    admit()
+    //intro_is_tree_cons x v #n #left #right;*)*)
 }
 
 ```
