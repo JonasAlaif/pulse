@@ -98,6 +98,8 @@ ensures (
 }
 ```
 
+module G = FStar.Ghost
+
 ```pulse
 ghost
 fn intro_is_tree_node (#t:Type0) (ct:tree_t t) (v:node_ptr t) (#node:node t) (#ltree:T.tree t) (#rtree:T.tree t)
@@ -619,7 +621,6 @@ fn create (t:Type0)
 //       None -> {
 //         intro_is_tree_nil x;
 //         show_proof_state;
-//         admit()
 //       }
 //       Some vl -> {
 //         admit()
@@ -715,94 +716,50 @@ fn create (t:Type0)
 // (*fn elim_is_tree_cons (#t:Type0) (ct:tree_t t) (ft:T.tree t) (data:t) (ltree:T.tree t) (rtree:T.tree t)
 // requires is_tree ct ft ** pure (ft == T.Node data ltree rtree)*)
 
-
+module G = FStar.Ghost
 
 ```pulse
-fn rec rotate_left (#t:Type0) (x:tree_t t) (#l:T.tree t{ Some? (T.rotate_left l) })
-requires is_tree x l
-returns y:tree_t t 
-ensures (is_tree y (Some?.v (T.rotate_left l)))
+fn get_some_ref (#t:Type) (x:tree_t t) (#ft:G.erased (T.tree t))
+requires is_tree x ft ** pure (T.Node? ft)
+returns v:node_ptr t
+ensures  
+  exists* (node:node t) (ltree:T.tree t) (rtree:T.tree t).
+    pure (x == Some v) **
+    pure (ft == T.Node node.data ltree rtree) **
+    pts_to v node **
+    is_tree node.left ltree **
+    is_tree node.right rtree
 {
-  
-
-
-  admit ()
-  // //get the node, node_x from the tree x --- T.Node data_x left_x right_x
-
-  //  let np = Some?.v x;
-   
-  //  is_tree_case_some x np;
-      
-  //  with _node _ltree _rtree._;
-      
-  //  let node_x = !np;
-      
-  //  rewrite each _node as node_x;
-
-  //  (*Current context:
-  //   is_tree node.right (reveal rtree) **
-  //   is_tree node.left (reveal ltree) ** pts_to np node ** is_tree rtr rtree*)
-
-  //  //get the data, data_x from the node_x --- data_x
-  //  let data_x = node_x.data;
-   
-  //  (* Current context:
-  //   pure (data_x == node_x.data) **
-  //   is_tree node_x.right (reveal rtree) **
-  //   is_tree node_x.left (reveal ltree) ** pts_to np node_x ** is_tree rtr rtree*)
-
-   
-
-  // //get the node, node_r from the right tree of x, node_x.right --- T.Node data_xr left_xr right_xr
-  // let r_np = Some?.v rtr;
-  // (*Current context:
-  //   pure (r_np == rtr.v) **
-  //   is_tree node_x.right (reveal rtree) **
-  //   is_tree node_x.left (reveal ltree) ** pts_to np node_x ** is_tree rtr rtree*)
-  
-  // is_tree_case_some rtr r_np;
-  // (*Current context:
-  //   (exists* (node:node t) (ltree:T.tree t) (rtree:T.tree t).
-  //     pts_to r_np node ** is_tree node.left ltree ** is_tree node.right rtree **
-  //     pure (rtree == T.Node node.data ltree rtree)) **
-  //   is_tree node_x.right (reveal rtree) **
-  //   is_tree node_x.left (reveal ltree) ** pts_to np node_x*)
-  
-  // show_proof_state;
-      
-  //  with _node_r _ltree_r _rtree_r._;
-      
-  //  let node_r = !r_np;
-      
-  //  rewrite each _node_r as node_r;
-  
-  
-  // show_proof_state;
-  // //get the data, data_r from node_r --- data_xr
-
-  // //create subnode with data_x, 
-  // // left tree as node.left
-  // // right tree as (node_r).left 
-
-  // // create a new node with data as data_r, left as x
-  // // right node_r.right;
-
-  // //write in (node_x).right new node
-
-  // //write in x subnode
-
-  // //pack_tree x (node_x.left) (node_r.left);
-
-  // //pack_tree (node_x.right) x (node_r.right);
-
-  // // (node_x.right)
-
-  // admit()
- 
+  match x {
+    None -> {
+      is_tree_case_none x;
+      unreachable ()
+    }
+    Some v -> {
+      is_tree_case_some x v;
+      v
+    }
+  }
 }
 ```
 
-
+```pulse
+fn rotate_left (#t:Type0) (tree:tree_t t) (#l:T.tree t{ Some? (T.rotate_left l) })
+requires is_tree tree l
+returns y:tree_t t 
+ensures (is_tree y (Some?.v (T.rotate_left l)))
+{
+  let vl = get_some_ref tree;
+  let n = !vl;
+  let vlr = get_some_ref n.right;
+  let nr = !vlr;
+  vlr := { data = n.data; left = n.left; right = nr.left };
+  intro_is_tree_node (Some vlr) vlr #{data = n.data; left = n.left; right = nr.left};
+  vl := { data = nr.data; left = Some vlr; right = nr.right };
+  intro_is_tree_node (Some vl) vl #{data = nr.data; left = Some vlr; right = nr.right};
+  Some vl
+}
+```
 
 (*(data:t) (ltree:T.tree t) (rtree:T.tree t)
 requires is_tree ct ft ** pure (ft == T.Node data ltree rtree)*)
