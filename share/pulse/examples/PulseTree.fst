@@ -129,7 +129,7 @@ let is_tree_cases #t (x:tree_t t) (ft: T.tree t)
       is_tree n.right rtree
 //is_tree_cases$
 
-```pulse //cases_of_is_tree$
+```pulse //cases_of_is_tree$ -CHECK THIS AGAIN
 ghost
 fn cases_of_is_tree #t (x:tree_t t) (ft:T.tree t)
 requires is_tree x ft
@@ -252,21 +252,23 @@ fn create (t:Type0)
   tree
 }
 ```
+(*Ctrl + K, Ctrl + U removes the // comments*)
 
-// ```pulse
-// fn node_cons (#t:Type0) (data:t) (ltree:tree_t t) (rtree:tree_t t) 
-//   requires is_tree ltree 'l  **
-//            is_tree rtree 'r  //functional equivalent of x is 'l; x is the tail of the constructed tree.
-//   returns y:tree_t t
-//   ensures is_tree y (T.Node v 'l 'r)
-// {
-//   let y = alloc { data=v; left =ltree; right = rtree };
-//   rewrite each ltree as ({data = v; left = ltree; right = rtree}).left in (is_tree ltree 'l);
-//   rewrite each rtree as ({data = v; left = ltree; right = rtree}).right in (is_tree rtree 'r);
-//   intro_is_tree_cons (Some y) y;
-//   Some y
-// }
-// ```
+```pulse
+fn node_cons (#t:Type0) (v:t) (ltree:tree_t t) (rtree:tree_t t) 
+  requires is_tree ltree 'l  **
+           is_tree rtree 'r  //functional equivalent of x is 'l; x is the tail of the constructed tree.
+  returns y:tree_t t
+  ensures is_tree y (T.Node v 'l 'r) ** (pure (Some? y))
+{
+  let y = alloc { data=v; left =ltree; right = rtree };
+  rewrite each ltree as ({data = v; left = ltree; right = rtree}).left in (is_tree ltree 'l);
+  rewrite each rtree as ({data = v; left = ltree; right = rtree}).right in (is_tree rtree 'r);
+  intro_is_tree_node (Some y) y;
+  Some y
+}
+```
+
 
 // val get_left (#a: Type0) (n: node a) : tree_t a
 // val get_right (#a: Type0) (n: node a) : tree_t a
@@ -290,326 +292,285 @@ fn create (t:Type0)
 
 
 
-// /// Appends value [v] at the leftmost leaf of the tree that [ptr] points to.
-// ```pulse
-// fn rec append_left_none (#t:Type0) (x:tree_t t) (v:t) 
-// requires is_tree x 'l ** pure (None? x)
-// returns y:tree_t t
-// ensures is_tree x 'l  ** is_tree y (T.Node v T.Leaf T.Leaf)
-// {
-//   let left = create t;
-//   let right = create t;
-//   let y = node_cons v left right;
-//       //intro_is_tree_nil x;
-//       //fold (is_tree y (T.append_left 'l v));
-//       //rewrite each (None #(ref (node t))) as x;
-//       //y
-//       //elim_is_tree_nil x;
-//   //intro_is_tree_nil x;
-//   //intro_is_tree_cons y;
-//   y // How can we remove is_tree x 'l from the context?
-// }
-// ```
+/// Appends value [v] at the leftmost leaf of the tree that [ptr] points to.
+```pulse
+fn rec append_left_none (#t:Type0) (x:tree_t t) (v:t) 
+requires is_tree x 'l ** pure (None? x)
+returns y:tree_t t
+ensures is_tree x 'l  ** is_tree y (T.Node v T.Leaf T.Leaf)
+{
+  let left = create t;
+  let right = create t;
+  let y = node_cons v left right;
+      //intro_is_tree_nil x;
+      //fold (is_tree y (T.append_left 'l v));
+      //rewrite each (None #(ref (node t))) as x;
+      //y
+      //elim_is_tree_nil x;
+  //intro_is_tree_nil x;
+  //intro_is_tree_cons y;
+  y // How can we remove is_tree x 'l from the context?
+}
+```
 
 
-// ```pulse
-// fn rec append_left (#t:Type0) (x:tree_t t) (v:t) 
-// requires is_tree x 'l
-// returns y:tree_t t
-// ensures is_tree y  (T.append_left 'l v)
-// {
-//    match x {
-//     None -> {
-//       //current context: is_tree x (reveal 'l)
-//       (*cond: requires is_tree x l ** pure (x == None)
-//               ensures  is_tree x l ** pure (l == T.Leaf)*)
-//       is_tree_case_none x;
-//       //current context: is_tree x (reveal 'l) ** pure (reveal 'l == T.Leaf)
-//       (*cond: requires is_tree x 'l ** pure ('l == T.Leaf)
-//               ensures pure (x == None)*)
-//       elim_is_tree_nil x;
-//       //current cotext: pure (x == None)
+
+```pulse
+fn rec append_left (#t:Type0) (x:tree_t t) (v:t) 
+requires is_tree x 'l
+returns y:tree_t t
+ensures is_tree y  (T.append_left 'l v)
+{
+   match x {
+    None -> {
+      //current context: is_tree x (reveal 'l)
+      (*cond: requires is_tree x l ** pure (x == None)
+              ensures  is_tree x l ** pure (l == T.Leaf)*)
+      is_tree_case_none x;
+      //current context: is_tree x (reveal 'l) ** pure (reveal 'l == T.Leaf)
+      (*cond: requires is_tree x 'l ** pure ('l == T.Leaf)
+              ensures pure (x == None)*)
+      elim_is_tree_leaf x;
+      //current cotext: pure (x == None)
       
-//       let left = create t;
-//       let right = create t;
-//       //Current context: is_tree right T.Leaf ** is_tree left T.Leaf
+      let left = create t;
+      let right = create t;
+      //Current context: is_tree right T.Leaf ** is_tree left T.Leaf
     
-//       let y = node_cons v left right;
-//       //Current context:
-//       //is_tree y (T.Node v (reveal (hide T.Leaf)) (reveal (hide T.Leaf))) **
-//       //pure (Some? y)
+      let y = node_cons v left right;
+      //Current context:
+      //is_tree y (T.Node v (reveal (hide T.Leaf)) (reveal (hide T.Leaf))) **
+      //pure (Some? y)
     
-//       let np = Some?.v y;
+      let np = Some?.v y;
       
-//     //Current context:
-//     //pure (np == y.v) **
-//     //is_tree y (T.Node v (reveal (hide T.Leaf)) (reveal (hide T.Leaf)))
-//      (*cond: requires is_tree x ft ** pure (x == Some v)
-//              ensures  
-//                 exists* (node:node t) (ltree:T.tree t) (rtree:T.tree t).
-//                 pts_to v node **
-//                 is_tree node.left ltree **
-//                 is_tree node.right rtree **
-//                 pure (ft == T.Node node.data ltree rtree)*)
-//      is_tree_case_some y np;
+    //Current context:
+    //pure (np == y.v) **
+    //is_tree y (T.Node v (reveal (hide T.Leaf)) (reveal (hide T.Leaf)))
+     (*cond: requires is_tree x ft ** pure (x == Some v)
+             ensures  
+                exists* (node:node t) (ltree:T.tree t) (rtree:T.tree t).
+                pts_to v node **
+                is_tree node.left ltree **
+                is_tree node.right rtree **
+                pure (ft == T.Node node.data ltree rtree)*)
+     is_tree_case_some y np;
 
-//      (*Current context:
-//                (exists* (node:node t) (ltree:T.tree t) (rtree:T.tree t).
-//                pts_to np node ** 
-//                is_tree node.left ltree ** 
-//                is_tree node.right rtree **
-//                pure (T.Node v (reveal (hide T.Leaf)) (reveal (hide T.Leaf)) ==
-//                T.Node node.data ltree rtree))*)
+     (*Current context:
+               (exists* (node:node t) (ltree:T.tree t) (rtree:T.tree t).
+               pts_to np node ** 
+               is_tree node.left ltree ** 
+               is_tree node.right rtree **
+               pure (T.Node v (reveal (hide T.Leaf)) (reveal (hide T.Leaf)) ==
+               T.Node node.data ltree rtree))*)
     
-//       intro_is_tree_cons y np;
+      intro_is_tree_node y np;
 
-//       (*Current context:
-//         is_tree y (T.Node (reveal node).data (reveal ltree) (reveal rtree)*)
-//       (*requires
-//         pts_to v node **
-//         is_tree node.left ltree **
-//         is_tree node.right rtree **
-//         pure (ct == Some v)
-//       ensures
-//         is_tree ct (T.Node node.data ltree rtree)*)
-//       y 
-//     }
-//     Some vl -> {
-//       //current context: is_tree x (reveal 'l)
-//       let np = Some?.v x;
-//       (*Current context:
-//         pure (np == x.v) ** is_tree x (reveal 'l)*)
-//       is_tree_case_some x np;
-//       (*Current context:
-//         (exists* (node:node t) (ltree:T.tree t) (rtree:T.tree t).
-//          pts_to np node ** is_tree node.left ltree ** is_tree node.right rtree **
-//          pure (reveal 'l == T.Node node.data ltree rtree))*)
-//       with _node _ltree _rtree._;
-//       (*Current context:
-//         pts_to np (reveal node) **
-//         is_tree (reveal node).left (reveal ltree) **
-//         is_tree (reveal node).right (reveal rtree) **
-//         pure (reveal 'l == T.Node (reveal node).data (reveal ltree) (reveal rtree))*)
-//       let node = !np;
-//       (*Current context:
-//          pts_to np (reveal node) **
-//          pure (reveal node == node) **
-//         is_tree (reveal node).left (reveal ltree) **
-//         is_tree (reveal node).right (reveal rtree)*)
+      (*Current context:
+        is_tree y (T.Node (reveal node).data (reveal ltree) (reveal rtree)*)
+      (*requires
+        pts_to v node **
+        is_tree node.left ltree **
+        is_tree node.right rtree **
+        pure (ct == Some v)
+      ensures
+        is_tree ct (T.Node node.data ltree rtree)*)
+      y 
+    }
+    Some vl -> {
+      //current context: is_tree x (reveal 'l)
+      let np = Some?.v x;
+      (*Current context:
+        pure (np == x.v) ** is_tree x (reveal 'l)*)
+      is_tree_case_some x np;
+      (*Current context:
+        (exists* (node:node t) (ltree:T.tree t) (rtree:T.tree t).
+         pts_to np node ** is_tree node.left ltree ** is_tree node.right rtree **
+         pure (reveal 'l == T.Node node.data ltree rtree))*)
+      with _node _ltree _rtree._;
+      (*Current context:
+        pts_to np (reveal node) **
+        is_tree (reveal node).left (reveal ltree) **
+        is_tree (reveal node).right (reveal rtree) **
+        pure (reveal 'l == T.Node (reveal node).data (reveal ltree) (reveal rtree))*)
+      let node = !np;
+      (*Current context:
+         pts_to np (reveal node) **
+         pure (reveal node == node) **
+        is_tree (reveal node).left (reveal ltree) **
+        is_tree (reveal node).right (reveal rtree)*)
       
-//       rewrite each _node as node;
+      rewrite each _node as node;
 
-//       (*Current context:
-//         is_tree node.right (reveal rtree) **
-//         is_tree node.left (reveal ltree) ** pts_to np node*)
+      (*Current context:
+        is_tree node.right (reveal rtree) **
+        is_tree node.left (reveal ltree) ** pts_to np node*)
 
       
-//       let left_new = append_left node.left v;
+      let left_new = append_left node.left v;
       
-//       (*Current context:
-//         is_tree left_new (T.append_left (reveal ltree) v) **
-//         pts_to np node ** is_tree node.right (reveal rtree)*)
-//       np := {node with left = left_new};
+      (*Current context:
+        is_tree left_new (T.append_left (reveal ltree) v) **
+        pts_to np node ** is_tree node.right (reveal rtree)*)
+      np := {node with left = left_new};
       
        
-//       (*Current context:
-//         pts_to np (Mknode node.data left_new node.right) **
-//         is_tree node.right (reveal rtree) **
-//         is_tree left_new (T.append_left (reveal ltree) v)*)
+      (*Current context:
+        pts_to np (Mknode node.data left_new node.right) **
+        is_tree node.right (reveal rtree) **
+        is_tree left_new (T.append_left (reveal ltree) v)*)
       
-//        rewrite each left_new as ({ node with left = left_new }).left in (is_tree left_new ((T.append_left (reveal _ltree) v)));
+       rewrite each left_new as ({ node with left = left_new }).left in (is_tree left_new ((T.append_left (reveal _ltree) v)));
       
 
-//       (*Current context:
-//          is_tree (Mknode node.data left_new node.right).left
-//                 (T.append_left (reveal ltree) v) **
-//          pts_to np (Mknode node.data left_new node.right) **
-//          is_tree node.right (reveal rtree)*)
+      (*Current context:
+         is_tree (Mknode node.data left_new node.right).left
+                (T.append_left (reveal ltree) v) **
+         pts_to np (Mknode node.data left_new node.right) **
+         is_tree node.right (reveal rtree)*)
 
-//        rewrite each node.right as ({ node with left = left_new }).right in (is_tree node.right _rtree);
+       rewrite each node.right as ({ node with left = left_new }).right in (is_tree node.right _rtree);
        
-//       (*Current context:
-//          is_tree (Mknode node.data left_new node.right).right (reveal rtree) **
-//          is_tree (Mknode node.data left_new node.right).left
-//                   (T.append_left (reveal ltree) v) **
-//         pts_to np (Mknode node.data left_new node.right)*)
+      (*Current context:
+         is_tree (Mknode node.data left_new node.right).right (reveal rtree) **
+         is_tree (Mknode node.data left_new node.right).left
+                  (T.append_left (reveal ltree) v) **
+        pts_to np (Mknode node.data left_new node.right)*)
        
-//        intro_is_tree_cons x np;
+       intro_is_tree_node x np;
 
-//        (*Current context:
-//         is_tree x
-//              (T.Node (Mknode node.data left_new node.right).data
-//                   (T.append_left (reveal ltree) v)
-//                   (reveal rtree))*)
-//        //show_proof_state;
+       (*Current context:
+        is_tree x
+             (T.Node (Mknode node.data left_new node.right).data
+                  (T.append_left (reveal ltree) v)
+                  (reveal rtree))*)
+       //show_proof_state;
 
-//       x
-//     }
-//   }
-// } 
-// ```
+      x
+    }
+  }
+} 
+```
 
 
-// ```pulse
-// fn rec append_right (#t:Type0) (x:tree_t t) (v:t) 
-// requires is_tree x 'l
-// returns y:tree_t t
-// ensures is_tree y  (T.append_right 'l v)
-// {
-//    match x {
-//     None -> {
+```pulse
+fn rec append_right (#t:Type0) (x:tree_t t) (v:t) 
+requires is_tree x 'l
+returns y:tree_t t
+ensures is_tree y  (T.append_right 'l v)
+{
+   match x {
+    None -> {
       
-//       is_tree_case_none x;
+      is_tree_case_none x;
       
-//       elim_is_tree_nil x;
+      elim_is_tree_leaf x;
      
-//       let left = create t;
-//       let right = create t;
+      let left = create t;
+      let right = create t;
       
     
-//       let y = node_cons v left right;
+      let y = node_cons v left right;
       
-//       let np = Some?.v y;
+      let np = Some?.v y;
       
-//       is_tree_case_some y np;
+      is_tree_case_some y np;
 
-//       intro_is_tree_cons y np;
+      intro_is_tree_node y np;
       
-//       y 
-//     }
-//     Some vl -> {
+      y 
+    }
+    Some vl -> {
       
-//       let np = Some?.v x;
+      let np = Some?.v x;
       
-//       is_tree_case_some x np;
+      is_tree_case_some x np;
       
-//       with _node _ltree _rtree._;
+      with _node _ltree _rtree._;
       
-//       let node = !np;
+      let node = !np;
       
-//       rewrite each _node as node;
+      rewrite each _node as node;
 
-//       let right_new = append_right node.right v;
+      let right_new = append_right node.right v;
       
-//       np := {node with right = right_new};
+      np := {node with right = right_new};
       
-//       rewrite each right_new as ({ node with right = right_new }).right in (is_tree right_new ((T.append_right (reveal _rtree) v)));
+      rewrite each right_new as ({ node with right = right_new }).right in (is_tree right_new ((T.append_right (reveal _rtree) v)));
       
-//       rewrite each node.left as ({node with right = right_new}).left in (is_tree node.left _ltree);
+      rewrite each node.left as ({node with right = right_new}).left in (is_tree node.left _ltree);
       
-//       intro_is_tree_cons x np;
+      intro_is_tree_node x np;
       
-//       x
-//     }
-//   }
-// } 
-// ```
+      x
+    }
+  }
+} 
+```
 
-// ```pulse
-// fn node_data (#t:Type) (x:tree_t t) 
-//     requires is_tree x 'l  ** (pure (Some? x))
-//     returns v:t
-//     ensures is_tree x 'l 
-// {
-//   let np = Some?.v x;
+```pulse
+fn node_data (#t:Type) (x:tree_t t) 
+    requires is_tree x 'l  ** (pure (Some? x))
+    returns v:t
+    ensures is_tree x 'l 
+{
+  let np = Some?.v x;
       
-//   is_tree_case_some x np;
+  is_tree_case_some x np;
       
-//   with _node _ltree _rtree._;
+  with _node _ltree _rtree._;
       
-//   let node = !np;
+  let node = !np;
       
-//   rewrite each _node as node;
+  rewrite each _node as node;
 
-//   let v = node.data;
+  let v = node.data;
   
-//   intro_is_tree_cons x np;
-//   v
-// }
-// ```
+  intro_is_tree_node x np;
+  v
+}
+```
 
-// ```pulse
-// fn rec is_mem (#t:eqtype) (x:tree_t t) (v: t)
-//     requires is_tree x 'l
-//     returns b:bool
-//     ensures is_tree x 'l ** pure (b <==> (T.mem 'l v))
-// {
-//    match x {
-//         None -> {
-//             is_tree_case_none x;
-//             false
-//         }
-//         Some vl -> {
-//             //let dat = node_data x;
-//             is_tree_case_some x vl;
-//             with _node _ltree _rtree. _;
-//             let n = !vl;
-//             rewrite each _node as n;
+```pulse
+fn rec is_mem (#t:eqtype) (x:tree_t t) (v: t)
+    requires is_tree x 'l
+    returns b:bool
+    ensures is_tree x 'l ** pure (b <==> (T.mem 'l v))
+{
+   match x {
+        None -> {
+            is_tree_case_none x;
+            false
+        }
+        Some vl -> {
+            //let dat = node_data x;
+            is_tree_case_some x vl;
+            with _node _ltree _rtree. _;
+            let n = !vl;
+            rewrite each _node as n;
 
-//             let dat = n.data;
+            let dat = n.data;
             
-//             if (dat = v) 
-//             {
-//               intro_is_tree_cons x vl;
-//               true
-//             }
-//             else{
-//               let b1 = is_mem n.left v;
-//               let b2 = is_mem n.right v;
+            if (dat = v) 
+            {
+              intro_is_tree_node x vl;
+              true
+            }
+            else{
+              let b1 = is_mem n.left v;
+              let b2 = is_mem n.right v;
 
-//               let b3 = b1 || b2;
-//               intro_is_tree_cons x vl;
-//               b3;
+              let b3 = b1 || b2;
+              intro_is_tree_node x vl;
+              b3;
               
-//             }
-//         }
-//     }
-// }
-// ```
-// ```pulse //cases_of_is_tree$
-// ghost
-// fn cases_of_is_tree_reverse #t (x:tree_t t) (ft:T.tree t)
-// requires  is_tree_cases x ft
-
-// ensures is_tree x ft
-// {
-//   admit()
-// }
-// ```
-
-// ```pulse //is_list_case_some$
-// ghost
-// fn is_tree_case_some1 (#t:Type) (x:tree_t t) (v:node_ptr t) (#ft:T.tree t) 
-// requires 
-// exists* (node:node t) (ltree:T.tree t) (rtree:T.tree t).
-//     is_tree x ft **
-//     pts_to v node **
-//     is_tree node.left ltree **
-//     is_tree node.right rtree **
-//     pure (ft == T.Node node.data ltree rtree)
-
-// ensures  is_tree x ft ** pure (x == Some v)
-   
-  
-// {
-  
-//   fold(is_tree_cases (Some v) ft);
-//   //rewrite each (Some v) as x;
-//   //show_proof_state;
-//   cases_of_is_tree_reverse (Some v) ft;
-//   //show_proof_state;
-//   assert (is_tree x ft);
-  
-//   //show_proof_state;
-  
-//   admit()
-// }
-// ```
+            }
+        }
+    }
+}
+```
 
 
-// (*cases_of_is_tree x ft;
-//   rewrite each x as (Some v);
-//   unfold (is_tree_cases (Some v) ft);*)
 
 // ```pulse
 // ghost
@@ -627,94 +588,6 @@ fn create (t:Type0)
 //       }
 //     }
    
-//     (*n intro_is_tree_cons (#t:Type0) (ct:tree_t t) (v:node_ptr t) (#node:node t) (#ltree:T.tree t) (#rtree:T.tree t)
-//   requires
-//   pts_to v node **
-//   is_tree node.left ltree **
-//   is_tree node.right rtree **
-//   pure (ct == Some v)*)
-
-//     (*elim_is_tree_cons x _ (T.Node?.data 'l) (T.Node?.left 'l) (T.Node?.right 'l);
-
-//     with v lct rct. _;
-//     with n left right. assert (pts_to v n ** is_tree lct left ** is_tree rct right);
-    
-//     (*Current context:
-//     pts_to (reveal p) (Mknode (reveal 'l).data (reveal lct) (reveal rct)) **
-//     is_tree (reveal lct) (reveal 'l).left **
-//     is_tree (reveal rct) (reveal 'l).right*)
-
-    
-//     rewrite each (reveal lct) as n.left;
-//     show_proof_state;
-//     // show_proof_state;
-
-//     (*Current context:
-//     is_tree (Mknode (reveal 'l).data (reveal lct) (reveal rct)).left
-//       (reveal 'l).left **
-//     pts_to (reveal p)
-//       (Mknode (reveal 'l).data
-//           (Mknode (reveal 'l).data (reveal lct) (reveal rct)).left
-//           (reveal rct)) **
-//     is_tree (reveal rct) (reveal 'l).right*)
-    
-//     rewrite each rct as n.right;
-//     show_proof_state;
-    
-//     (*Current context:
-//     is_tree (Mknode (reveal 'l).data (reveal lct) (reveal rct)).right
-//       (reveal 'l).right **
-
-//     pts_to (reveal p)
-//       (Mknode (reveal 'l).data
-//           (Mknode (reveal 'l).data
-//               (reveal lct)
-//               (Mknode (reveal 'l).data (reveal lct) (reveal rct)).right)
-//             .left
-//           (Mknode (reveal 'l).data (reveal lct) (reveal rct)).right) **
-
-//     is_tree (Mknode (reveal 'l).data
-//           (reveal lct)
-//           (Mknode (reveal 'l).data (reveal lct) (reveal rct)).right)
-//         .left
-//       (reveal 'l).left
-
-
-//     show_proof_state;
-    
-    
-    
-
-   
-//     //show_proof_state;
-//     //intro_is_tree_cons x v #n #left #right;*)*)
-// }
-
-// ```
-
-// (*```pulse //non_empty_list$
-// ghost
-// fn non_empty_list (#t:Type0) (x:llist t)
-// requires is_list x 'l ** pure (Cons? 'l)
-// ensures is_list x 'l ** pure (Some? x)
-// {
-//     elim_is_list_cons x _ (Cons?.hd 'l) (Cons?.tl 'l);
-//     with v tail. _;
-//     with n tl. assert (pts_to v n ** is_list tail tl);
-//     rewrite each tail as n.tail;
-//     intro_is_list_cons x v #n #tl;
-// }
-// ```*)
-
-// (*n intro_is_tree_cons (#t:Type0) (ct:tree_t t) (v:node_ptr t) (#node:node t) (#ltree:T.tree t) (#rtree:T.tree t)
-// requires
-//   pts_to v node **
-//   is_tree node.left ltree **
-//   is_tree node.right rtree **
-//   pure (ct == Some v)*)
-
-// (*fn elim_is_tree_cons (#t:Type0) (ct:tree_t t) (ft:T.tree t) (data:t) (ltree:T.tree t) (rtree:T.tree t)
-// requires is_tree ct ft ** pure (ft == T.Node data ltree rtree)*)
 
 module G = FStar.Ghost
 
@@ -742,7 +615,11 @@ ensures
   }
 }
 ```
-
+(*let rotate_left (#a: Type) (r: tree a) : option (tree a) =
+  match r with
+  | Node x t1 (Node z t2 t3) -> Some (Node z (Node x t1 t2) t3)
+  | _ -> None*)
+  
 ```pulse
 fn rotate_left (#t:Type0) (tree:tree_t t) (#l:T.tree t{ Some? (T.rotate_left l) })
 requires is_tree tree l
@@ -753,26 +630,153 @@ ensures (is_tree y (Some?.v (T.rotate_left l)))
   let n = !vl;
   let vlr = get_some_ref n.right;
   let nr = !vlr;
+  (*--------------------------------------------------------------------------------------*)
+  (*vl points to n*)
+  (*x = n.data, t1 = n.left, (Node z t2 t3) = n.right *)
+
+  (*vlr points to nr*)
+  (*z = nr.data, t2 = nr.left, t3 = nr.right*)
+  (*--------------------------------------------------------------------------------------*)
+
   vlr := { data = n.data; left = n.left; right = nr.left };
+  
+  (*vlr points to a sub_node as above *)
+  (*x = n.data = sub_node.data, t1 = n.left = sub_node.left, t2 = nr.left = sub_node.right*)
+  (*Node x t1 t2 ---- shape of spec*)
+  
   intro_is_tree_node (Some vlr) vlr #{data = n.data; left = n.left; right = nr.left};
+  (*pack the sub_node into a tree as above (Some vlr) is the tree which is an optional pointer to a node*)
+  
+  (*vl points to new_node*)
   vl := { data = nr.data; left = Some vlr; right = nr.right };
+  (*z = nr.data = new_node.data, Some vlr = sub_node_tree = new_node.left, t3 = nr.right = new_node.right *)
+  (*(Node z (Node x t1 t2) t3) ----- shape of spec*) 
+
   intro_is_tree_node (Some vl) vl #{data = nr.data; left = Some vlr; right = nr.right};
+  (*pack new_node pointed to vl as a tree, (Some vl)*)
+
+  Some vl
+  (*return the newly formed tree.*)
+  (*is_tree takes a concrete tree which is a (option node pointer), and a functional tree*)
+  (*The functional tree is passed as l and the pre-condition says that the functional tree 
+    obtained after rotating l to the left is Some*)
+  (*for post condition, extract the functional tree from Some and match with the tree returned (Some vl)*)
+}
+```
+(*let rotate_right (#a: Type) (r: tree a) : option (tree a) =
+  match r with
+  | Node x (Node z t1 t2) t3 -> Some (Node z t1 (Node x t2 t3))
+  | _ -> None*)
+
+```pulse
+fn rotate_right (#t:Type0) (tree:tree_t t) (#l:T.tree t{ Some? (T.rotate_right l) })
+requires is_tree tree l
+returns y:tree_t t 
+ensures (is_tree y (Some?.v (T.rotate_right l)))
+{
+  let vl = get_some_ref tree;
+  let n = !vl;
+  let vll = get_some_ref n.left;
+  let nl = !vll;
+
+  (*create the sub_node, (Node x t2 t3)*)
+  vll := {data = n.data; left = nl.right; right = n.right};
+
+  (*pack the sub_node pointed to vll as a new tree*)
+  intro_is_tree_node (Some vll) vll #{data = n.data; left = nl.right; right = n.right};
+
+  (*create the new_node (Node z t1 (Node x t2 t3))*)
+  vl := {data = nl.data; left = nl.left; right = Some vll};
+
+  (*pack the new_node pointed to vl as a new_tree*)
+  intro_is_tree_node (Some vl) vl #{data = nl.data; left = nl.left; right = Some vll};
+  Some vl
+}
+```
+(*let rotate_right_left (#a: Type) (r: tree a) : option (tree a) =
+  match r with
+  | Node x t1 (Node z (Node y t2 t3) t4) -> Some (Node y (Node x t1 t2) (Node z t3 t4))
+  | _ -> None*)
+
+```pulse
+fn rotate_right_left (#t:Type0) (tree:tree_t t) (#l:T.tree t{ Some? (T.rotate_right_left l) })
+requires is_tree tree l
+returns y:tree_t t 
+ensures (is_tree y (Some?.v (T.rotate_right_left l)))
+{
+  let vl = get_some_ref tree;
+  let n = !vl;
+
+  let vlr = get_some_ref n.right;
+
+  let nr = !vlr;
+  
+  let vlrl = get_some_ref nr.left;
+
+  let nrl = !vlrl;
+
+  (*Construction of sub_node_right*)
+   
+  vlr := {data = nr.data; left = nrl.right; right = nr.right};
+  (* (Node z t3 t4)*)
+  intro_is_tree_node (Some vlr) vlr #{data = nr.data; left = nrl.right; right = nr.right};
+  //intro_is_tree_node (Some vlrl) vlrl #{data = nr.data; left = nrl.right; right = nr.right};
+
+  vlrl := {data = n.data; left = n.left; right = nrl.left};
+
+  intro_is_tree_node (Some vlrl) vlrl #{data = n.data; left = n.left; right = nrl.left};
+
+  vl := {data = nrl.data; left = Some vlrl; right = Some vlr};
+
+  intro_is_tree_node (Some vl) vl #{data = nrl.data; left = Some vlrl; right = Some vlr};
+
+  Some vl
+}
+```
+(*let rotate_left_right (#a: Type) (r: tree a) : option (tree a) =
+  match r with
+  | Node x (Node z t1 (Node y t2 t3)) t4 -> Some (Node y (Node z t1 t2) (Node x t3 t4))
+  | _ -> None*)
+```pulse
+fn rotate_left_right (#t:Type0) (tree:tree_t t) (#l:T.tree t{ Some? (T.rotate_left_right l) })
+requires is_tree tree l
+returns y:tree_t t 
+ensures (is_tree y (Some?.v (T.rotate_left_right l)))
+{
+  (*Node x (Node z t1 (Node y t2 t3)) t4 -> Some (Node y (Node z t1 t2) (Node x t3 t4))
+                      |----vllr---|
+           |----------vll-----------|
+   |---------vl------------------------|            *)
+  let vl = get_some_ref tree;
+
+  let n = !vl;
+
+  let vll = get_some_ref n.left;
+
+  let nl = !vll;
+
+  let vllr = get_some_ref nl.right;
+
+  let nlr = !vllr;
+
+  vllr := {data = n.data; left = nlr.right; right = n.right};
+
+  vll := {data = nl.data; left = nl.left; right = nlr.left};
+
+  intro_is_tree_node (Some vllr) vllr #{data = n.data; left = nlr.right; right = n.right};
+
+  intro_is_tree_node (Some vll) vll #{data = nl.data; left = nl.left; right = nlr.left};
+
+  vl := {data = nlr.data; left = Some (vll); right = Some vllr};
+
+  intro_is_tree_node (Some vl) vl #{data = nlr.data; left = Some (vll); right = Some vllr};
+  
   Some vl
 }
 ```
 
-(*(data:t) (ltree:T.tree t) (rtree:T.tree t)
-requires is_tree ct ft ** pure (ft == T.Node data ltree rtree)*)
 
 
 
-(*fn is_tree_case_some (#t:Type) (x:tree_t t) (v:node_ptr t) (#ft:T.tree t) 
-requires is_tree x ft ** pure (x == Some v)
-ensures  
-   exists* (node:node t) (ltree:T.tree t) (rtree:T.tree t).
-    pts_to v node **
-    is_tree node.left ltree **
-    is_tree node.right rtree **
-    pure (ft == T.Node node.data ltree rtree)*)
 
-    
+
