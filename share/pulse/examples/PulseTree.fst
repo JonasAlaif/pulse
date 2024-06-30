@@ -774,9 +774,239 @@ ensures (is_tree y (Some?.v (T.rotate_left_right l)))
   Some vl
 }
 ```
+(*** Functions related to AVL trees ***)
 
+/// Returns a boolean indicating if the tree that [ptr] points to is balanced
 
+(*let rec is_balanced (#a: Type) (x: tree a) : bool =
+  match x with
+  | Leaf -> true
+  | Node data left right ->
+    M.abs(height right - height left) <= 1 &&
+    is_balanced(right) &&
+    is_balanced(left)*)
 
+module M = FStar.Math.Lib
 
+```pulse
+fn rec is_balanced (#t:Type0) (tree:tree_t t)
+requires is_tree tree 'l
+returns b:bool
+ensures is_tree tree 'l ** pure (b <==> (T.is_balanced 'l))
+{
+  match tree {
+    None -> {
+      is_tree_case_none tree;
+      true
+    }
+    Some vl -> {
+      is_tree_case_some tree vl;
+      let n = !vl;
+
+      let height_l = height n.left;
+      let height_r = height n.right;
+
+      let b1 =  (M.abs(height_r - height_l) <= 1);
+
+      let b2 = is_balanced n.right;
+
+      let b3 = is_balanced n.left;
+
+      let b4 = b1 && b2 && b3;
+      
+      intro_is_tree_node tree vl;
+      
+      b4
+    }
+  }
+}
+
+```
+/// Rebalances a tree according to the comparison function [cmp] on the tree elements
+
+(*let rebalance_avl (#a: Type) (x: tree a) : tree a =
+    match x with
+    | Leaf -> x
+    | Node data left right ->
+
+      if is_balanced x then x
+      else (
+
+        if height left - height right > 1 then (
+          let Node ldata lleft lright = left in
+          if height lright > height lleft then (
+            match rotate_left_right x with
+            | Some y -> y
+            | _ -> x
+          ) else (
+            match rotate_right x with
+            | Some y -> y
+            | _ -> x
+          )
+
+        ) else if height left - height right < -1 then (
+          let Node rdata rleft rright = right in
+            if height rleft > height rright then (
+              match rotate_right_left x with
+              | Some y -> y
+              | _ -> x
+            ) else (
+              match rotate_left x with
+              | Some y -> y
+              | _ -> x
+            )
+        ) else (
+          x
+        )
+      )
+
+*)
+
+```pulse
+fn rec  rebalance_avl (#t:Type0) (tree:tree_t t)
+requires is_tree tree 'l
+returns y:tree_t t 
+ensures (is_tree y (T.rebalance_avl 'l))
+{
+  //if the below statament is put in the Some branch, it will not work. 
+  //Because is_tree tree 'l is not in context at that point.
+  //Why it is not there in context at that point? Is it desirable?
+  let b = is_balanced tree;
+  match tree {
+    None -> {
+      is_tree_case_none tree;
+      tree
+    }
+    Some vl -> {
+      is_tree_case_some tree vl;
+      
+      if (b)
+      {
+        intro_is_tree_node tree vl;
+        tree
+      }
+      else
+      {
+        let n = !vl;
+        let height_l = height n.left;
+        let height_r = height n.right;
+        
+        let diff_height = height_l - height_r ;
+
+        if (diff_height > 1) 
+        {
+          let vll = get_some_ref n.left;
+          intro_is_tree_node n.left vll;
+          is_tree_case_some n.left vll;
+         
+
+          let nl = !vll;
+
+          let height_ll = height nl.left;
+          let height_lr = height nl.right;
+
+          if (height_lr > height_ll)
+          {
+             (*Only in this branch, this situation happens, Node x (Node z t1 (Node y t2 t3)) t4*)
+             let vllr = get_some_ref nl.right;
+             intro_is_tree_node nl.right vllr;
+             is_tree_case_some nl.right vllr;
+             
+             //intro_is_tree_node n.left vll;
+            
+             
+             //intro_is_tree_node tree vl;
+             
+             
+             (*Current context:
+                      is_tree tree
+                               (T.Node n.data
+                                (T.Node nl.data
+                                    (G.reveal ltree)
+                                        (T.Node (G.reveal node).data (G.reveal ltree) (G.reveal rtree)))
+                                    (G.reveal rtree))*)
+
+             //let y = rotate_left_right tree;
+
+             
+
+            
+
+            admit()
+          }
+          else
+          {
+            admit()
+          }
+          
+          
+          
+        }
+        else if (diff_height < -1)
+        {
+          admit()
+        }
+        else
+        {
+          intro_is_tree_node tree vl;
+          tree
+        }
+        
+      }
+    }
+  }
+}
+```
+
+```pulse
+fn rec insert_avl (#t:Type0) (cmp: T.cmp t) (tree:tree_t t) (key: t)
+requires is_tree tree 'l
+returns y:tree_t t 
+ensures (is_tree y (T.insert_avl cmp 'l key))
+{
+  match tree {
+    None -> {
+       is_tree_case_none tree;
+      
+       elim_is_tree_leaf tree;
+     
+       let left = create t;
+       let right = create t;
+      
+    
+       let y = node_cons key left right;
+      
+       let np = Some?.v y;
+      
+       is_tree_case_some y np;
+
+       intro_is_tree_node y np;
+       
+       y
+    }
+    Some vl -> {
+      is_tree_case_some tree vl;
+      let n = !vl;
+      let delta = cmp n.data key;
+      if (delta >= 0)
+      {
+        let new_left = insert_avl cmp n.left key;
+        vl := {data = n.data; left = new_left; right = n.right};
+        intro_is_tree_node (Some vl) vl #({data = n.data; left = new_left; right = n.right});
+        let new_tree = rebalance_avl (Some vl);
+        new_tree
+      }
+      else
+      {
+        let new_right = insert_avl cmp n.right key;
+        vl := {data = n.data; left = n.left; right = new_right};
+        intro_is_tree_node (Some vl) vl #({data = n.data; left = n.left; right = new_right});
+        let new_tree = rebalance_avl (Some vl);
+        new_tree
+      }
+    }
+  }
+}
+```
 
 
