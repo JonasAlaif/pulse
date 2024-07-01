@@ -621,7 +621,7 @@ ensures
   | _ -> None*)
   
 ```pulse
-fn rotate_left (#t:Type0) (tree:tree_t t) (#l:T.tree t{ Some? (T.rotate_left l) })
+fn rotate_left (#t:Type0) (tree:tree_t t) (#l:G.erased (T.tree t){ Some? (T.rotate_left l) })
 requires is_tree tree l
 returns y:tree_t t 
 ensures (is_tree y (Some?.v (T.rotate_left l)))
@@ -663,13 +663,16 @@ ensures (is_tree y (Some?.v (T.rotate_left l)))
   (*for post condition, extract the functional tree from Some and match with the tree returned (Some vl)*)
 }
 ```
+
 (*let rotate_right (#a: Type) (r: tree a) : option (tree a) =
   match r with
   | Node x (Node z t1 t2) t3 -> Some (Node z t1 (Node x t2 t3))
   | _ -> None*)
 
+
+
 ```pulse
-fn rotate_right (#t:Type0) (tree:tree_t t) (#l:T.tree t{ Some? (T.rotate_right l) })
+fn rotate_right (#t:Type0) (tree:tree_t t) (#l:G.erased (T.tree t){ Some? (T.rotate_right l) })
 requires is_tree tree l
 returns y:tree_t t 
 ensures (is_tree y (Some?.v (T.rotate_right l)))
@@ -699,7 +702,7 @@ ensures (is_tree y (Some?.v (T.rotate_right l)))
   | _ -> None*)
 
 ```pulse
-fn rotate_right_left (#t:Type0) (tree:tree_t t) (#l:T.tree t{ Some? (T.rotate_right_left l) })
+fn rotate_right_left (#t:Type0) (tree:tree_t t) (#l:G.erased (T.tree t){ Some? (T.rotate_right_left l) })
 requires is_tree tree l
 returns y:tree_t t 
 ensures (is_tree y (Some?.v (T.rotate_right_left l)))
@@ -733,12 +736,13 @@ ensures (is_tree y (Some?.v (T.rotate_right_left l)))
   Some vl
 }
 ```
+
 (*let rotate_left_right (#a: Type) (r: tree a) : option (tree a) =
   match r with
   | Node x (Node z t1 (Node y t2 t3)) t4 -> Some (Node y (Node z t1 t2) (Node x t3 t4))
   | _ -> None*)
 ```pulse
-fn rotate_left_right (#t:Type0) (tree:tree_t t) (#l:T.tree t{ Some? (T.rotate_left_right l) })
+fn rotate_left_right (#t:Type0) (tree:tree_t t) (#l:G.erased (T.tree t){ Some? (T.rotate_left_right l) })
 requires is_tree tree l
 returns y:tree_t t 
 ensures (is_tree y (Some?.v (T.rotate_left_right l)))
@@ -774,6 +778,7 @@ ensures (is_tree y (Some?.v (T.rotate_left_right l)))
   Some vl
 }
 ```
+
 (*** Functions related to AVL trees ***)
 
 /// Returns a boolean indicating if the tree that [ptr] points to is balanced
@@ -822,6 +827,7 @@ ensures is_tree tree 'l ** pure (b <==> (T.is_balanced 'l))
 }
 
 ```
+
 /// Rebalances a tree according to the comparison function [cmp] on the tree elements
 
 (*let rebalance_avl (#a: Type) (x: tree a) : tree a =
@@ -909,14 +915,14 @@ ensures (is_tree y (T.rebalance_avl 'l))
           {
              (*Only in this branch, this situation happens, Node x (Node z t1 (Node y t2 t3)) t4*)
              let vllr = get_some_ref nl.right;
-             intro_is_tree_node nl.right vllr;
-             is_tree_case_some nl.right vllr;
              
-             //intro_is_tree_node n.left vll;
+             (*pack tree back in the order it is unpacked*)
+             intro_is_tree_node nl.right vllr;
+             
+             intro_is_tree_node n.left vll;
             
              
-             //intro_is_tree_node tree vl;
-             
+             intro_is_tree_node tree vl;
              
              (*Current context:
                       is_tree tree
@@ -926,25 +932,50 @@ ensures (is_tree y (T.rebalance_avl 'l))
                                         (T.Node (G.reveal node).data (G.reveal ltree) (G.reveal rtree)))
                                     (G.reveal rtree))*)
 
-             //let y = rotate_left_right tree;
-
-             
-
-            
-
-            admit()
+             let y = rotate_left_right tree;
+             y
           }
           else
           {
-            admit()
+            (*Node x (Node z t1 t2) t3*)
+            intro_is_tree_node n.left vll;
+            intro_is_tree_node tree vl;
+            let y = rotate_right tree;
+            y
           }
-          
-          
-          
         }
         else if (diff_height < -1)
         {
-          admit()
+          let vlr = get_some_ref n.right;
+          intro_is_tree_node n.right vlr;
+          is_tree_case_some n.right vlr;
+         
+
+          let nr = !vlr;
+
+          let height_rl = height nr.left;
+          let height_rr = height nr.right;
+          if (height_rl > height_rr)
+          {
+             (*Node x t1 (Node z (Node y t2 t3) t4)*)
+             let vlrl = get_some_ref nr.left;
+             
+             (*pack tree back in the order it is unpacked*)
+             intro_is_tree_node nr.left vlrl;
+             intro_is_tree_node n.right vlr;
+             intro_is_tree_node tree vl;
+             let y = rotate_right_left tree;
+             y
+          }
+          else
+          {
+            (*Node x t1 (Node z t2 t3)*)
+            intro_is_tree_node n.right vlr;
+            intro_is_tree_node tree vl;
+            let y = rotate_left tree;
+            y
+          }
+          
         }
         else
         {
